@@ -1,0 +1,11 @@
+<div> <!-- Doesn't look right so far, but separated to mess with later. -->
+  <h2><%= @list[:name] %></h2>
+  <p>Edit List</p>
+</div>
+<ul> <!-- Bare bones code here to build a list of the todos. -->
+  <% @todos.each do |todo| %>
+    <li>
+        <p><%= todo %></p>
+    </li>
+  <% end %>
+</ul>
