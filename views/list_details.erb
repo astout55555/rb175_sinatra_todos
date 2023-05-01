@@ -1,15 +1,36 @@
 <section id="todos">
-  <header> <!-- Doesn't look right so far, but separated to mess with later. -->
+  <header>
     <h2><%= @list[:name] %></h2>
-    <p>Edit List</p>
-  </header>
-  <ul> <!-- Bare bones code here to build a list of the todos. -->
-    <% @todos.each do |todo| %>
+    <ul>
       <li>
-          <p><%= todo %></p>
+        <a href="/lists/<%= @list_id.to_s %>/edit" class="edit">Edit List</a>
+      </li>
+    </ul>
+  </header>
+
+  <ul>
+    <% @list[:todos].each_with_index do |todo, todo_id| %>
+      <li>
+        <h3><%= todo[:name] %></h3>
       </li>
     <% end %>
   </ul>
 </section>
 
-<a href="/lists">All Lists</a>
+<form action="/lists/<%= @list_id.to_s %>/todos" method="post">
+  <dl>
+    <dt>
+      <label for="todo">Enter a new todo item:</label>
+    </dt>
+    <dd>
+      <input name="todo" id="todo" placeholder="Something to do" type="text" value="<%= params[:todo] %>">
+    </dd>
+  </dl>
+  <fieldset class="actions">
+    <input type="submit" value="Add">
+  </fieldset>
+</form>
+
+<% content_for :header_links do %>
+  <a href="/lists">All Lists</a>
+<% end %>
