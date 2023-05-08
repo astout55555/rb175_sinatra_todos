@@ -1,23 +1,36 @@
-<section id="todos">
+<section id="todos" class=<%= list_class(@list) %>>
   <header>
     <h2><%= @list[:name] %></h2>
     <ul>
       <li>
-        <a href="/lists/<%= @list_id.to_s %>/edit" class="edit">Edit List</a>
+        <form action="/lists/<%= @list_id %>/complete_all" method="post">
+          <button class="check" type="submit">Complete All</button>
+        </form>
+      </li>
+      <li>
+        <a href="/lists/<%= @list_id %>/edit" class="edit">Edit List</a>
       </li>
     </ul>
   </header>
 
   <ul>
-    <% @list[:todos].each_with_index do |todo, todo_id| %>
-      <li>
+    <% sort_and_display(@list[:todos]) do |todo, todo_id| %>
+      <li class=<%= todo_class(todo) %>>
+        <form action="/lists/<%= @list_id %>/todos/<%= todo_id %>/check" method="post" class="check">
+          <input type="hidden" name="completed" value="<%= !todo[:completed] %>">
+          <button type="submit">Complete</button>
+        </form>
+
         <h3><%= todo[:name] %></h3>
+        <form action="/lists/<%= @list_id %>/todos/<%= todo_id %>/delete" method="post" class="delete">
+          <button type="submit">Delete</button>
+        </form>
       </li>
     <% end %>
   </ul>
 </section>
 
-<form action="/lists/<%= @list_id.to_s %>/todos" method="post">
+<form action="/lists/<%= @list_id %>/todos" method="post">
   <dl>
     <dt>
       <label for="todo">Enter a new todo item:</label>
@@ -32,5 +45,5 @@
 </form>
 
 <% content_for :header_links do %>
-  <a href="/lists">All Lists</a>
+  <a class="list" href="/lists">All Lists</a>
 <% end %>

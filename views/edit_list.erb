@@ -1,10 +1,9 @@
-<!--Code goes here for the "Editing `list_name`" and the "Delete List" stuff up top-->
 <section id="todos">
   <header>
     <h2>Editing '<%= @list[:name] %>'</h2>
     <ul>
       <li>
-        <form action="/lists/<%= @list_id.to_s %>/delete" method="post">
+        <form action="/lists/<%= @list_id %>/delete" method="post">
           <button class="delete" type="submit">Delete List</button>
         </form>
       </li>
@@ -13,7 +12,7 @@
 
   <br>
 
-  <form action="/lists/<%= @list_id.to_s %>" method="post">
+  <form action="/lists/<%= @list_id %>" method="post">
     <dl>
       <dt>
         <label for="list_name">Enter the new name for the list:</label>
@@ -24,7 +23,7 @@
     </dl>
     <fieldset class="actions">
       <input type="submit" value="Save"> <!--`input` instead of `button` for css purposes-->
-      <a href="/lists/<%= @list_id.to_s %>">Cancel</a>
+      <a href="/lists/<%= @list_id %>">Cancel</a>
     </fieldset>
   </form>
 </section>

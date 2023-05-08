@@ -1,14 +1,19 @@
 <ul id="lists">
-  <% @lists.each_with_index do |list, id| %>
-    <li>
-      <a href="/lists/<%= id %>">
+  <%#
+    This is how I can comment out code...
+    However, I can't seem to comment out any code that includes embedded ruby,
+    unless I escape the special tags like this `\%\>` to avoid ending comment. 
+  %>
+  <% sort_and_display(@lists) do |list, list_id| %>
+    <li class=<%= list_class(list) %>>
+      <a href="/lists/<%= list_id %>">
         <h2><%= list[:name] %></h2>
-        <p><%= list[:todos].size %>/<%= list[:todos].size %></p>
+        <p><%= todos_remaining_count(list) %>/<%= list[:todos].size %></p>
       </a>
     </li>
   <% end %>
 </ul>
 
 <% content_for :header_links do %>
-  <a href="/lists/new">New List</a>
+  <a class="add" href="/lists/new">New List</a>
 <% end %>
