@@ -3,10 +3,7 @@ require "sinatra/reloader" if development?
 require "tilt/erubis"
 require "sinatra/content_for"
 
-=begin
-
-### Data Structure Notes ###
-
+# Session Data Structure:
 # session {
 #   lists: [array of list hashes] # list_id based on array position
 # }
@@ -19,15 +16,14 @@ require "sinatra/content_for"
     #   completed: boolean
     # }
 
-=end
-
 configure do
   enable :sessions
   set :session_secret, 'secret'
+  set :erb, :escape_html => true
 end
 
 not_found do
-  "<html><body><h1>Not Found</h1></body></html>"
+  "<html><body><h1>404 Not Found</h1></body></html>"
 end
 
 # Return an error message if the name is invalid. Return nil if name is valid.
@@ -39,8 +35,17 @@ def error_for_list_name(name)
   end
 end
 
-def list?(item)
-  session[:lists].include?(item)
+def error_for_todo(name)
+  return unless !(1..100).cover?(name.size)
+  "Todo must be between 1 and 100 characters."
+end
+
+def load_list(index)
+  list = session[:lists][index] if index && session[:lists][index]
+  return list if list
+
+  session[:error] = "The specified list was not found."
+  redirect "/lists"
 end
 
 helpers do
@@ -134,28 +139,18 @@ get "/lists/new" do
 end
 # Placed above the next route to avoid `:id` being set as 'new'
 
+# View a single list
 get "/lists/:list_id" do
   @list_id = params[:list_id].to_i
-  if (0...session[:lists].size).cover?(@list_id)
-    @list = session[:lists][@list_id]
-    @todos = @list[:todos]
-    erb :list_details # show list details for selected list
-  else
-    session[:error] = "The specified list could not be found."
-    redirect "/lists"
-  end
+  @list = load_list(@list_id)
+  erb :list_details # show list details for selected list
 end
 
 # Render the list edit form
 get "/lists/:list_id/edit" do
   @list_id = params[:list_id].to_i
-  if (0...session[:lists].size).cover?(@list_id)
-    @list = session[:lists][@list_id]
-    erb :edit_list # show form to edit selected list name
-  else
-    session[:error] = "The specified list could not be found."
-    redirect "/lists"
-  end
+  @list = load_list(@list_id)
+  erb :edit_list # show form to edit selected list name
 end
 
 # Edit the list title
@@ -163,7 +158,7 @@ post "/lists/:list_id" do
   list_name = params[:list_name].strip
 
   @list_id = params[:list_id].to_i
-  @list = session[:lists][@list_id]
+  @list = load_list(@list_id)
 
   error = error_for_list_name(list_name)
   if error
@@ -183,15 +178,10 @@ post "/lists/:list_id/delete" do
   redirect "/lists"
 end
 
-def error_for_todo(name)
-  return unless !(1..100).cover?(name.size)
-  "Todo must be between 1 and 100 characters."
-end
-
 # Add a todo item to a list
 post "/lists/:list_id/todos" do
   @list_id = params[:list_id].to_i
-  @list = session[:lists][@list_id]
+  @list = load_list(@list_id)
   name = params[:todo].strip
 
   error = error_for_todo(name)
@@ -208,7 +198,7 @@ end
 # Delete a todo item from the list
 post "/lists/:list_id/todos/:todo_id/delete" do
   @list_id = params[:list_id].to_i
-  @list = session[:lists][@list_id]
+  @list = load_list(@list_id)
   todo_id = params[:todo_id].to_i
 
   @list[:todos].delete_at(todo_id)
@@ -219,7 +209,7 @@ end
 # Update completion status of a todo item
 post "/lists/:list_id/todos/:todo_id/check" do
   @list_id = params[:list_id].to_i
-  @list = session[:lists][@list_id]
+  @list = load_list(@list_id)
   todo = @list[:todos][params[:todo_id].to_i]
 
   if params[:completed] == 'false'
@@ -235,7 +225,7 @@ end
 # Complete all todos
 post "/lists/:list_id/complete_all" do
   @list_id = params[:list_id].to_i
-  @list = session[:lists][@list_id]
+  @list = load_list(@list_id)
 
   @list[:todos].each do |todo|
     todo[:completed] = true
