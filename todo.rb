@@ -40,12 +40,18 @@ def error_for_todo(name)
   "Todo must be between 1 and 100 characters."
 end
 
-def load_list(index)
-  list = session[:lists][index] if index && session[:lists][index]
-  return list if list
+def load_list(list_id)
+  session[:lists].each do |list|
+    return list if list[:id] == list_id
+  end
 
   session[:error] = "The specified list was not found."
   redirect "/lists"
+end
+
+def next_id(lists_or_todos)
+  max = lists_or_todos.map { |element| element[:id] }.max || 0
+  max + 1
 end
 
 helpers do
@@ -66,41 +72,17 @@ helpers do
     "complete" if todo[:completed]
   end
 
-  # my solution before I saw LS solution:
-  # general for both lists and todos, but that pushes it over the 10 line limit
-  # (rubocop gets mad). it also uses a `list?` helper method for clarity,
-  # but the code is just one line anyway: `session[:lists].include?(item)`.
-  # def id_and_sort_by_completion(lists_or_todos)
-  #   identified = {}
-
-  #   lists_or_todos.each_with_index do |item, id|
-  #     identified[item] = id
-  #   end
-
-  #   identified.sort_by do |item, _|
-  #     if list?(item)
-  #       list_complete?(item) ? 1 : 0
-  #     else
-  #       item[:completed] ? 1 : 0
-  #     end
-  #   end
-  # end
-
-  # my final version, combining the 2 LS methods:
-  # yields lists or todos to block in correct order,
-  # doesn't require calling #each on the return value.
-  # rubocop flags the unused explicit block param `&block` so I dropped it.
-  def sort_and_display(lists_or_todos)
-    complete, incomplete = lists_or_todos.partition do |item|
-      if session[:lists].include?(item) # if list
-        list_complete?(item)
+  def sort_and_display(lists_or_todos, &block)
+    complete, incomplete = lists_or_todos.partition do |element|
+      if session[:lists].include?(element) # if list
+        list_complete?(element)
       else # if todo
-        item[:completed]
+        element[:completed]
       end
     end
 
-    incomplete.each { |item| yield item, lists_or_todos.index(item) }
-    complete.each { |item| yield item, lists_or_todos.index(item) }
+    incomplete.each(&block)
+    complete.each(&block)
   end
 end
 
@@ -127,7 +109,8 @@ post "/lists" do
     session[:error] = error
     erb :new_list
   else
-    session[:lists] << { name: list_name, todos: [] }
+    id = next_id(session[:lists])
+    session[:lists] << { id: id, name: list_name, todos: [] }
     session[:success] = "The list has been created."
     redirect "/lists"
   end
@@ -141,15 +124,13 @@ end
 
 # View a single list
 get "/lists/:list_id" do
-  @list_id = params[:list_id].to_i
-  @list = load_list(@list_id)
+  @list = load_list(params[:list_id].to_i)
   erb :list_details # show list details for selected list
 end
 
 # Render the list edit form
 get "/lists/:list_id/edit" do
-  @list_id = params[:list_id].to_i
-  @list = load_list(@list_id)
+  @list = load_list(params[:list_id].to_i)
   erb :edit_list # show form to edit selected list name
 end
 
@@ -157,8 +138,7 @@ end
 post "/lists/:list_id" do
   list_name = params[:list_name].strip
 
-  @list_id = params[:list_id].to_i
-  @list = load_list(@list_id)
+  @list = load_list(params[:list_id].to_i)
 
   error = error_for_list_name(list_name)
   if error
@@ -167,21 +147,24 @@ post "/lists/:list_id" do
   else
     @list[:name] = list_name
     session[:success] = "The list has been updated."
-    redirect "/lists/#{@list_id}"
+    redirect "/lists/#{@list[:id]}"
   end
 end
 
 # Delete the list
 post "/lists/:list_id/delete" do
-  session[:lists].delete_at(params[:list_id].to_i)
-  session[:success] = "The list has been deleted."
-  redirect "/lists"
+  session[:lists].delete_if{ |list| list[:id] == params[:list_id].to_i }
+  if env["HTTP_X_REQUESTED_WITH"] == "XMLHttpRequest"
+    "/lists"
+  else
+    session[:success] = "The list has been deleted."
+    redirect "/lists"  
+  end
 end
 
 # Add a todo item to a list
 post "/lists/:list_id/todos" do
-  @list_id = params[:list_id].to_i
-  @list = load_list(@list_id)
+  @list = load_list(params[:list_id].to_i)
   name = params[:todo].strip
 
   error = error_for_todo(name)
@@ -189,28 +172,33 @@ post "/lists/:list_id/todos" do
     session[:error] = error
     erb :list_details
   else
+    id = next_id(@list[:todos])
+    @list[:todos] << { id: id, name: name, completed: false }
     session[:success] = "The todo was added."
-    @list[:todos] << { name: name, completed: false }
-    redirect "/lists/#{@list_id}"
+    redirect "/lists/#{@list[:id]}"
   end
 end
 
 # Delete a todo item from the list
 post "/lists/:list_id/todos/:todo_id/delete" do
-  @list_id = params[:list_id].to_i
-  @list = load_list(@list_id)
-  todo_id = params[:todo_id].to_i
+  @list = load_list(params[:list_id].to_i)
 
-  @list[:todos].delete_at(todo_id)
-  session[:success] = "The todo has been deleted."
-  redirect "/lists/#{@list_id}"
+  todo_id = params[:todo_id].to_i
+  @list[:todos].delete_if { |todo| todo[:id] == todo_id }
+
+  if env["HTTP_X_REQUESTED_WITH"] == "XMLHttpRequest"
+    status 204
+  else
+    session[:success] = "The todo has been deleted."
+    redirect "/lists/#{@list[:id]}"
+  end
 end
 
 # Update completion status of a todo item
 post "/lists/:list_id/todos/:todo_id/check" do
-  @list_id = params[:list_id].to_i
-  @list = load_list(@list_id)
-  todo = @list[:todos][params[:todo_id].to_i]
+  @list = load_list(params[:list_id].to_i)
+  todo_id = params[:todo_id].to_i
+  todo = @list[:todos].find { |todo| todo[:id] == todo_id }
 
   if params[:completed] == 'false'
     todo[:completed] = false
@@ -219,18 +207,17 @@ post "/lists/:list_id/todos/:todo_id/check" do
   end
 
   session[:success] = "The todo has been updated."
-  redirect "/lists/#{@list_id}"
+  redirect "/lists/#{@list[:id]}"
 end
 
 # Complete all todos
 post "/lists/:list_id/complete_all" do
-  @list_id = params[:list_id].to_i
-  @list = load_list(@list_id)
+  @list = load_list(params[:list_id].to_i)
 
   @list[:todos].each do |todo|
     todo[:completed] = true
   end
 
   session[:success] = "All todos have been completed."
-  redirect "/lists/#{@list_id}"
+  redirect "/lists/#{@list[:id]}"
 end
